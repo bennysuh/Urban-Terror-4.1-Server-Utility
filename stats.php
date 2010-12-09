@@ -87,7 +87,7 @@ class Stats {
 		$colorreplace = array('', '', '', '', '', '', '', '', '', '');
 		$temp_name = str_replace($colorcodes, $colorreplace, $name);
 		// Now that any color codes are removed, let's see if there's an attempt to have a tag in place
-		if (stripos(' ' . $temp_name, "/evo/") || stripos($temp_name, "(evo)") || stripos($temp_name, "[evo]") || stripos($temp_name, "{evo}")) {
+		if (stripos(' ' . $temp_name, "/evo/") || stripos(' ' . $temp_name, "(evo)") || stripos(' ' . $temp_name, "[evo]") || stripos($temp_name, "{evo}")) {
 			// There appears to be a tag in place.
 			$this->server->slots[$slot]->tagged_up = 1;
 		} else {
@@ -140,7 +140,17 @@ class Stats {
 				// Same player, let's check name
 				if ($name != $this->server->slots[$slot]->name) {
 					// Player has changed names
-					$this->server->slots[$slot]->change_name($name);
+					$this->server->slots[$slot]->disconnect();
+					$this->server->slots[$slot] = new Player;
+					$this->server->slots[$slot]->ip = $ip;
+					$this->server->slots[$slot]->name = $name;
+					$this->server->slots[$slot]->cl_guid = $cl_guid;
+					$this->server->slots[$slot]->name_length = $name_length;
+					$this->server->slots[$slot]->password = $password;
+					$this->server->slots[$slot]->gear = $gear;
+					$this->server->slots[$slot]->permissions_id = $permissions_id;
+					$this->server->slots[$slot]->time_connected = time();
+					$this->server->connect($slot);
 					$info_changed = true;
 				}
 			}
@@ -194,8 +204,10 @@ class Stats {
 			$this->server->slots[$slot]->enforce_team();
 		}
 		// See if GUID is muted
-		if ($guid_mute_info_id = $this->bans->is_guid_muted($this->server->slots[$slot]->guids_id)) {
-			if ($ip_mute_info_id = $this->bans->is_ip_muted($this->server->slots[$slot]->ips_id)) {
+		$guid_mute_info_id = $this->bans->is_guid_muted($this->server->slots[$slot]->guids_id);
+		if ($guid_mute_info_id) {
+			$ip_mute_info_id = $this->bans->is_ip_muted($this->server->slots[$slot]->ips_id);
+			if ($ip_mute_info_id) {
 				// IP already muted
 			} else {
 				// New IP, expire old IP mutes
@@ -206,8 +218,10 @@ class Stats {
 			}
 		}
 		// See if IP is muted
-		if ($ip_mute_info_id = $this->bans->is_ip_muted($this->server->slots[$slot]->ips_id)) {
-			if ($guid_mute_info_id = $this->bans->is_guid_muted($this->server->slots[$slot]->guids_id)) {
+		$ip_mute_info_id = $this->bans->is_ip_muted($this->server->slots[$slot]->ips_id);
+		if ($ip_mute_info_id) {
+			$guid_mute_info_id = $this->bans->is_guid_muted($this->server->slots[$slot]->guids_id);
+			if ($guid_mute_info_id) {
 				// GUID already muted
 			} else {
 				// Mute new GUID
@@ -235,8 +249,10 @@ class Stats {
 			$this->server->tell($slot, $mutemessage);
 		}
 		// See if GUID is banned
-		if ($guid_ban_info_id = $this->bans->is_guid_banned($this->server->slots[$slot]->guids_id)) {
-			if ($ip_ban_info_id = $this->bans->is_ip_banned($this->server->slots[$slot]->ips_id)) {
+		$guid_ban_info_id = $this->bans->is_guid_banned($this->server->slots[$slot]->guids_id);
+		if ($guid_ban_info_id) {
+			$ip_ban_info_id = $this->bans->is_ip_banned($this->server->slots[$slot]->ips_id);
+			if ($ip_ban_info_id) {
 				// IP already banned
 			} else {
 				// New IP, expire old IP bans
@@ -247,8 +263,10 @@ class Stats {
 			}
 		}
 		// See if IP is banned
-		if ($ip_ban_info_id = $this->bans->is_ip_banned($this->server->slots[$slot]->ips_id)) {
-			if ($guid_ban_info_id = $this->bans->is_guid_banned($this->server->slots[$slot]->guids_id)) {
+		$ip_ban_info_id = $this->bans->is_ip_banned($this->server->slots[$slot]->ips_id);
+		if ($ip_ban_info_id) {
+			$guid_ban_info_id = $this->bans->is_guid_banned($this->server->slots[$slot]->guids_id);
+			if ($guid_ban_info_id) {
 				// GUID already banned
 			} else {
 				// Ban new GUID
@@ -257,7 +275,8 @@ class Stats {
 			}
 		}
 		// See if Name is allowed
-		if ($name_ban_info_id = $this->bans->is_name_forbidden($this->server->slots[$slot]->name)) {
+		$name_ban_info_id = $this->bans->is_name_forbidden($this->server->slots[$slot]->name);
+		if ($name_ban_info_id) {
 			// Name is forbidden, kick with reason
 			$reason = "^2Your ^2name ^2is ^2forbidden. ^2For ^2more ^2information, ^2email ^2bans@evogc.com ^2and ^2reference ^2forbidden ^2name ^2id ^2{$name_ban_info_id}";
 			$this->server->kick($slot, $reason);
@@ -281,41 +300,75 @@ class Stats {
 	public function process_clientdisconnect($line) {
 		$slotend = strpos($line, "\n");
 		$slot = substr($line, 0, $slotend);
-		$this->update_activity($slot);
+		$this->end_activity_record($this->server->slots[$slot]->guids_id, $this->server->slots[$slot]->ips_id, $this->server->slots[$slot]->names_id, $slot);
 		$this->server->disconnect($slot);
-
-
-		$t = time();
-		$this->time_seen = date('H:i:s', $t);
-		$this->date_seen = date('Y-m-d', $t);
-		$table = $this->prefix . "player_activity";
-		$queryselect = "SELECT `id`";
-		$queryfrom = "FROM $table ";
-		$querywhere = "WHERE guids_id=%d AND names_id=%d AND ips_id=%d AND slot=%d AND servers_id=%d AND status = 1";
-		//$queryorder = "ORDER BY date_seen DESC, end_time DESC LIMIT 1";
-		$querytext = $queryselect . $queryfrom . $querywhere;
-		$query = sprintf($querytext, $this->guids_id, $this->names_id, $this->ips_id, $this->slot, $this->sv_id);
-		$activityresult = mysql_query($query, $this->link);
-		//echo "Line: " . __LINE__ . " " . $query . "\n";
-		$activityrow = mysql_fetch_row($activityresult);
-		$queryupdate = "UPDATE $table ";
-		$queryset = "SET end_time = '$this->time_seen', date_last_seen = '$this->date_seen', status = 0 ";
-		$querywhere = "WHERE `id` = $activityrow[0]";
-		$query = $queryupdate . $queryset . $querywhere;
-		$activityresult = mysql_query($query, $this->link);
 	} // end process_clientdisconnect
 
-	public function update_activity($slot) {
+	public function begin_activity_record($guids_id, $ips_id, $names_id, $slot) {
+		$t = time();
+		$this->db->table = $this->db->prefix . "player_activity";
+		$this->db->query_type = "INSERT";
+		$this->db->fields[0] = "`guids_id`";
+		$this->db->values[0] = "'" . mysql_escape_string($this->db->normalize_int($guids_id)) . "'";
+		$this->db->fields[1] = "`ips_id`";
+		$this->db->values[1] = "'" . mysql_escape_string($this->db->normalize_int($ips_id)) . "'";
+		$this->db->fields[2] = "`names_id`";
+		$this->db->values[2] = "'" . mysql_escape_string($this->db->normalize_int($names_id)) . "'";
+		$this->db->fields[3] = "`servers_id`";
+		$this->db->values[3] = "'" . mysql_escape_string($this->db->normalize_int($this->server->servers_id)) . "'";
+		$this->db->fields[4] = "`slot`";
+		$this->db->values[4] = "'" . mysql_escape_string($this->db->normalize_int($slot)) . "'";
+		$this->db->fields[5] = "`date_first_seen`";
+		$this->db->values[5] = "'" . mysql_escape_string($this->db->normalize_string(date('Y-m-d', $t))) . "'";
+		$this->db->fields[6] = "`start_time`";
+		$this->db->values[6] = "'" . mysql_escape_string($this->db->normalize_string(date('H:i:s', $t))) . "'";
+		$this->db->fields[7] = "`date_last_seen`";
+		$this->db->values[7] = "'" . mysql_escape_string($this->db->normalize_string(date('Y-m-d', $t))) . "'";
+		$this->db->fields[8] = "`end_time`";
+		$this->db->values[8] = "'" . mysql_escape_string($this->db->normalize_string(date('H:i:s', $t))) . "'";
+		$this->db->fields[9] = "`status`";
+		$this->db->values[9] = "'1'";
+		$this->db->fields[10] = "`connect_epoch`";
+		$this->db->values[10] = "'$t'";
+		$this->db->fields[11] = "`disconnect_epoch`";
+		$this->db->values[11] = "'$t'";
+		$this->db->stats_query();
+		return $this->db->get_last_id();
+	} // end begin_activity_record
 
-	} // end update_activity
+	public function end_activity_record($guids_id, $ips_id, $names_id, $slot, $activity_id) {
+		$t = time();
+		$this->db->table = $this->db->prefix . "player_activity";
+		$this->db->query_type = "UPDATE";
+		$this->db->fields[0] = "`date_last_seen`";
+		$this->db->values[0] = "'" . mysql_escape_string($this->db->normalize_string(date('Y-m-d', $t))) . "'";
+		$this->db->fields[1] = "`end_time`";
+		$this->db->values[1] = "'" . mysql_escape_string($this->db->normalize_string(date('H:i:s', $t))) . "'";
+		$this->db->fields[2] = "`disconnect_epoch`";
+		$this->db->values[2] = "'$t'";
+		$this->db->fields[3] = "`status`";
+		$this->db->values[3] = "'0'";
+		$this->db->criteria_fields[0] = "`id`";
+		$this->db->criteria_values[0] = "'" . mysql_escape_string($this->db->normalize_int($activity_id)) . "'";
+		$this->db->criteria_type[0] = "=";
+		$this->db->stats_query();
+	} // end end_activity_record
 
-	public function create_activity($slot) {
-
-	} // end create_activity
-
-	public function end_activity($slot){
-
-	} // end end_activity
+	public function update_activity_record($guids_id, $ips_id, $names_id, $slot, $activity_id) {
+		$t = time();
+		$this->db->table = $this->db->prefix . "player_activity";
+		$this->db->query_type = "UPDATE";
+		$this->db->fields[0] = "`date_last_seen`";
+		$this->db->values[0] = "'" . mysql_escape_string($this->db->normalize_string(date('Y-m-d', $t))) . "'";
+		$this->db->fields[1] = "`end_time`";
+		$this->db->values[1] = "'" . mysql_escape_string($this->db->normalize_string(date('H:i:s', $t))) . "'";
+		$this->db->fields[2] = "`disconnect_epoch`";
+		$this->db->values[2] = "'$t'";
+		$this->db->criteria_fields[0] = "`id`";
+		$this->db->criteria_values[0] = "'" . mysql_escape_string($this->db->normalize_int($activity_id)) . "'";
+		$this->db->criteria_type[0] = "=";
+		$this->db->stats_query();
+	} // end end_activity_record
 
 	public function is_active($slot) {
 		$this->db->table = $this->db->prefix . "player_activity";
@@ -347,5 +400,78 @@ class Stats {
 			$row = $this->db->get_row();
 			return $row[0];
 		}
-	} // end is_active
+	} // end
+
+	public function process_kill($line) {
+		// get the attacker info and trim
+		$attackerend = strpos($line, ' ');
+		$attacker = substr($line, 0, $attackerend);
+		$line = substr($line, $attackerend);
+		$line = ltrim($line);
+		// get the victim info and trim
+		$victimend = strpos($line, ' ');
+		$victim = substr($line, 0, $victimend);
+		$line = substr($line, $victimend);
+		$line = ltrim($line);
+		// get the weapon info and trim
+		$weaponend = strpos($line, ':');
+		$weapon = substr($line, 0, $weaponend);
+		$line = substr($line, $weaponend);
+		$line = ltrim($line);
+		// get the attacker name to check for <non-client> for when people bleed to deatch after having fallen and caused injury to themselves
+		$attackerend = strpos($line, ' ');
+		$attackername = substr($line, 0, $attackerend);
+		// get death type
+		$line = rtrim($line);
+		$deathtypebegin = strrpos($line, " ");
+		$deathtypebegin++;
+		$deathtype = substr($line, $deathtypebegin);
+		$deathtype = rtrim($line);
+		$this->store_deathtype($attacker, $victim, $deathtype);
+		$this->store_killtype($attacker, $victim, $deathtype);
+		$this->calculate_kill_points($attacker, $victim);
+
+
+		if ($this->attacker == 1022 || $this->attacker == 0) {
+			$this->attacker = $this->victim;
+		}
+		if ($deathtype != "MOD_CHANGE_TEAM") {
+			$this->get_attacker_info();
+			$this->get_victim_info();
+		}
+		if ($deathtype == "UT_MOD_BLED") {
+			// Bled to death. Credit kill to the last attacker that made them bleed
+			$this->attacker_guids_id = $this->current_players[$this->victim][11];
+			$this->attacker_ips_id = $this->current_players[$this->victim][12];
+			$this->attacker_names_id = $this->current_players[$this->victim][13];
+		}
+		if ($deathtype != "MOD_CHANGE_TEAM") {
+			$this->calculate_kill_points($weapon);
+			// Insert entry in the stats table
+			$this->update_recover($this->attacker);
+			$this->update_recover($this->victim);
+		}
+		$table = $this->prefix . "log_last";
+		$query = "UPDATE $table SET `line` = $this->last_log_line, `location` = $loc WHERE `servers_id` = $this->sv_id";
+		$lastlogline = mysql_query($query, $this->link);
+		$table = $this->prefix . "stats";
+		$query = "INSERT INTO $table (type, servers_id, log_line, log_location, log_date, log_time, log_epoch, ";
+		$query .= "attacker_ips_id, attacker_names_id, victim_ips_id, victim_names_id, weapon) ";
+		$query .= "VALUES (10, $this->sv_id, $this->last_log_line, $loc, '$log_date', '$log_time', $this->log_epoch, ";
+		$query .= "$this->attacker_ips_id, $this->attacker_names_id, $this->victim_ips_id, ";
+		$query .= "$this->victim_names_id, $weapon)";
+		$log_line_insert_result = mysql_query($query, $this->link);
+		//echo "Log Line: $this->last_log_line Line: " . __LINE__ . " " . $query . "\n";
+		break;
+	} // end process_kill
+
+	public function store_deathtype($attacker, $victim, $deathtype) {
+		if ($attacker == $victim || $attacker == 1022) {
+			// Self inflicted
+			if ($deathtype )
+		} else {
+			// Normal kill
+			
+		}
+	} // end store_deathtype
 }

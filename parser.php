@@ -76,7 +76,12 @@ class Parser {
 					$this->stats->store_log_line($this->log->ltime, $this->log->ldate, $this->log->lepoch, $this->log->location, $this->log->last_line, 8);
 					break;
 				case "ClientDisconnect:":
+					$this->stats->process_clientdisconnect($line[2]);
 					$this->stats->store_log_line($this->log->ltime, $this->log->ldate, $this->log->lepoch, $this->log->location, $this->log->last_line, 9);
+					break;
+				case "Kill:":
+					$this->stats->process_kill($line[2]);
+					$this->stats->store_log_line($this->log->ltime, $this->log->ldate, $this->log->lepoch, $this->log->location, $this->log->last_line, 10);
 					break;
 
 			}

@@ -97,8 +97,28 @@ class Server {
 	} // end connect
 	
 	public function disconnect($slot) {
-		
+		// end activity
+		$this->end_activity_record($this->slots[$slot]->guids_id, $this->slots[$slot]->ips_id, $this->slots[$slot]->names_id, $slot, $this->slots[$slot]->activity_id);
+		// Store stats
+		$this->store_stats($slot);
+		// destroy player object
+		$this->slots[$slot]->__destruct();
 	} // end disconnect
+
+	public function store_stats($slot) {
+		$this->db->table = $this->db->prefix . "scores_month";
+		$this->db->query_type = "UPDATE";
+		$this->db->fields[0] = "`date_last_seen`";
+		$this->db->values[0] = "'" . mysql_escape_string($this->db->normalize_string(date('Y-m-d', $t))) . "'";
+		$this->db->fields[1] = "`end_time`";
+		$this->db->values[1] = "'" . mysql_escape_string($this->db->normalize_string(date('H:i:s', $t))) . "'";
+		$this->db->fields[2] = "`disconnect_epoch`";
+		$this->db->values[2] = "'$t'";
+		$this->db->criteria_fields[0] = "`id`";
+		$this->db->criteria_values[0] = "'" . mysql_escape_string($this->db->normalize_int($activity_id)) . "'";
+		$this->db->criteria_type[0] = "=";
+		$this->db->stats_query();
+	} // end store_stats
 
 	public function begin_activity_record($guids_id, $ips_id, $names_id, $slot) {
 		$t = time();
@@ -130,7 +150,23 @@ class Server {
 		$this->db->values[11] = "'$t'";
 		$this->db->stats_query();
 		return $this->db->get_last_id();
-	}
+	} // end begin_activity_record
+
+	public function end_activity_record($guids_id, $ips_id, $names_id, $slot, $activity_id) {
+		$t = time();
+		$this->db->table = $this->db->prefix . "player_activity";
+		$this->db->query_type = "UPDATE";
+		$this->db->fields[0] = "`date_last_seen`";
+		$this->db->values[0] = "'" . mysql_escape_string($this->db->normalize_string(date('Y-m-d', $t))) . "'";
+		$this->db->fields[1] = "`end_time`";
+		$this->db->values[1] = "'" . mysql_escape_string($this->db->normalize_string(date('H:i:s', $t))) . "'";
+		$this->db->fields[2] = "`disconnect_epoch`";
+		$this->db->values[2] = "'$t'";
+		$this->db->criteria_fields[0] = "`id`";
+		$this->db->criteria_values[0] = "'" . mysql_escape_string($this->db->normalize_int($activity_id)) . "'";
+		$this->db->criteria_type[0] = "=";
+		$this->db->stats_query();
+	} // end end_activity_record
 
 	public function is_guid_entered($cl_guid) {
 		$this->db->table = $this->db->prefix . "guids";
@@ -328,11 +364,11 @@ class Server {
 
 	public function tag_enforcement() {
 
-	}
+	} // end tag_enforcement
 
 	public function team_enforcement() {
 
-	}
+	} // end team_enforcement
 
 	public function schedule_kick($slot = 0, $ban_info_id = 0, $comments = "none") {
 		if ($slot == 0) {
@@ -365,7 +401,7 @@ class Server {
 		$this->db->fields[7] = "`status`";
 		$this->db->values[7] = "'" . mysql_escape_string($this->db->normalize_string("incomplete")) . "'";
 		$this->db->stats_query();
-	}
+	} // end schedule_kick
 
 	public function kick($slot, $reason = "no reason given") {
 		$rcmd = "kick $slot" . '"' . $reason . '"';
@@ -376,7 +412,7 @@ class Server {
 		}
 		$buf = "\xff\xff\xff\xffrcon $this->rcon $rcmd";
 		socket_sendto($socket, $buf, strlen($buf), 0, $this->ip, $this->port);
-	}
+	} // end kick
 
 	public function mute($slot) {
 		$rcmd = "mute $slot";
@@ -387,7 +423,7 @@ class Server {
 		}
 		$buf = "\xff\xff\xff\xffrcon $this->rcon $rcmd";
 		socket_sendto($socket, $buf, strlen($buf), 0, $this->ip, $this->port);
-	}
+	} // end mute
 
 	public function tell($slot, $message) {
 		$rcmd = "tell $slot" . '"' . $message . '"';
@@ -398,7 +434,7 @@ class Server {
 		}
 		$buf = "\xff\xff\xff\xffrcon $this->rcon $rcmd";
 		socket_sendto($socket, $buf, strlen($buf), 0, $this->ip, $this->port);
-	}
+	} // end tell
 
 }
 
