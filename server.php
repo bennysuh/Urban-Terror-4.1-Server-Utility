@@ -25,6 +25,8 @@
  *      MA 02110-1301, USA.
  */
 
+// Version 0.1.2
+
 require_once("db.php");
 
 class Server {
@@ -38,6 +40,9 @@ class Server {
 	public $rcon;
 	public $servers_id;
 
+	// Settings and messages
+	public $tag_enforce_strict;
+	public $tag_enforce_location;
 	// Methods
 
 	public function __construct() {

@@ -25,6 +25,8 @@
  *      MA 02110-1301, USA.
 */
 
+// Version 0.1.2
+
 class Stats {
 
 	// Properties
@@ -99,17 +101,8 @@ class Stats {
 			}
 			$j++;
 		}
-		// First, let's check to see if someone is tagged up
-		$colorcodes = array('^0', '^1', '^2', '^3', '^4', '^5', '^6', '^7', '^8', '^9');
-		$colorreplace = array('', '', '', '', '', '', '', '', '', '');
-		$temp_name = str_replace($colorcodes, $colorreplace, $name);
-		// Now that any color codes are removed, let's see if there's an attempt to have a tag in place
-		if (stripos(' ' . $temp_name, "/evo/") || stripos(' ' . $temp_name, "(evo)") || stripos(' ' . $temp_name, "[evo]") || stripos($temp_name, "{evo}")) {
-			// There appears to be a tag in place.
-			$this->server->slots[$slot]->tagged_up = 1;
-		} else {
-			$this->server->slots[$slot]->tagged_up = 0;
-		}
+		// Check for presence of a clan tag
+		$this->server->slots[$slot]->tagged_up = $this->is_tagged_up($name, $slot);
 		if ($this->server->slots[$slot]->new_player) {
 			// Definitely a new player
 			$this->server->slots[$slot]->ip = $ip;
@@ -187,10 +180,20 @@ class Stats {
 		if ($info_changed) {
 			// Update restore info and get permissions
 			$this->server->slots[$slot]->get_permissions();
-			if ($this->server->slots[$slot]->tagged_up && $this->server->tag_enforcement()) {
-				if ($this->server->slots[$slot]->permissions_type != "evo_admin" || $this->server->slots[$slot]->permissions_type != "evo_member") {
-					$this->server->schedule_kick($slot, 0, "improperly tagged");
-				}
+			if ($this->server->slots[$slot]->tagged_up && $this->server->tag_enforcement() && !$this->properly_tagged($slot)) {
+				$this->server->schedule_kick($slot, 0, "improperly tagged");
+			}
+			if ($this->server->name_reservations() && !$this->name_owner($name, $slot)) {
+				// Server configured to honor reserved names
+				$this->server->schedule_kick($slot, 0, "name reserved");
+			}
+			if ($this->server->invite_reservations() && !$this->invite_member($slot) && $this->server->public_slots_full()) {
+				// Server configured to reserve slots for invite players and no public slots are available
+				$this->server->schedule_kick($slot, 0, "no public slots available");
+			}
+			if ($this->server->top_ranked_reservations() && !$this->invite_member($slot) && $this->server->public_slots_full() && $this->server->invite_slots_full()) {
+				// Server configured to reserve slots for top ranked players
+				$this->server->schedule_kick($slot, 0, "only top ranked slots available");
 			}
 			$this->server->slots[$slot]->update_recover();
 		}
@@ -485,10 +488,68 @@ class Stats {
 	public function store_deathtype($attacker, $victim, $deathtype) {
 		if ($attacker == $victim || $attacker == 1022) {
 			// Self inflicted
-			if ($deathtype )
+			if ($deathtype ) {
+
+			}
 		} else {
 			// Normal kill
 			
 		}
 	} // end store_deathtype
+
+	public function is_tagged_up($name, $slot) {
+		$this->db->table = $this->db->prefix . "clan_tags";
+		$this->db->query_type = "SELECT";
+		$this->db->fields[0] = "`tag`";
+		$this->db->stats_query();
+		// Remove color codes
+		$colorcodes = array('^0', '^1', '^2', '^3', '^4', '^5', '^6', '^7', '^8', '^9');
+		$colorreplace = array('', '', '', '', '', '', '', '', '', '');
+		$name = str_replace($colorcodes, $colorreplace, $name);
+		// Remove spaces
+		$spaces = array(' ');
+		$spacesreplace = array('');
+		$name = str_replace($spaces, $spacesreplace, $name);
+		$j = 0;
+		$this->server->slots[$slot]->tags = array();
+		while ($row = $this->db->get_row()) {
+			$tag = $row[0];
+			if ($this->server->tag_enforce_strict) {
+				// Only check for tag at specified location
+				if ($this->server->tag_enforce_location == "beginning") {
+					$tag_length = strlen($tag);
+					if (stripos(substr($name, 0, $tag_length), $tag)) {
+						// tag found
+						$this->server->slots[$slot]->tags[$j] = $tag;
+						$j++;
+					}
+				} elseif ($this->server->tag_enforce_location == "end") {
+					$name_length = strlen($name);
+					$tag_length = strlen($tag);
+					$tag_search_begin = $name_length - $tag_length;
+					if (stripos($name, $tag, $tag_search_begin)) {
+						// tag found
+						$this->server->slots[$slot]->tags[$j] = $tag;
+						$j++;
+					}
+				} else {
+					// Undefined. This should never happen
+				}
+
+			} else {
+				// Check for tag anywhere in the name
+				if (stripos(' ' . $name, $tag)) {
+					// tag found
+					$this->server->slots[$slot]->tags[$j] = $tag;
+					$j++;
+				}
+			}
+		}
+
+		if (count($this->server->slots[$slot]->tags)) {
+			return 1;
+		} else {
+			return 0;
+		}
+	} // end is_tagged_up
 }

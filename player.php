@@ -25,10 +25,13 @@
  *      MA 02110-1301, USA.
  */
 
+// Version 0.1.2
+
 class Player {
 
 	// Properties
 
+	public $tags; // array of clan tags found on player
 	public $name; // client Name
 	public $names_id; // ID from database for Name
 	public $name_length; // Name length of client

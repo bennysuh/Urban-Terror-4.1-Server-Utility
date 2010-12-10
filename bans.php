@@ -25,6 +25,8 @@
  *      MA 02110-1301, USA.
  */
 
+// Version 0.1.2
+
 class Bans {
 
 	// Properties
