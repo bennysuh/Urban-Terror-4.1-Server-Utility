@@ -36,6 +36,56 @@ class Parser {
 	public $log;
 
 	// Methods
+
+	public function rcon_status($server_reply) {
+		$s = $server_reply;
+		$loc = strpos($s, "\n");
+		do {
+			$line = substr($s, 0, strpos($s, "\n"));
+			if (strpos($s, "map:") === 0) {
+				$mapinfo = explode(':', $line);
+				$map = ltrim(rtrim($mapinfo[1]));
+				echo "$map\n";
+				$s = substr(strstr($s, "\n"), 1);
+			} elseif (strpos($s, "num") === 0) {
+				$s = substr(strstr($s, "\n"), 1);
+			} elseif (strpos($s, "-") === 0) {
+				$s = substr(strstr($s, "\n"), 1);
+			} elseif (strpos($s, "\n") !== 0) {
+				$slot = substr(ltrim($line), 0, strpos(ltrim($line), " "));
+				$line = ltrim(substr(ltrim($line), strpos(ltrim($line), " ")));
+				$score = substr(ltrim($line), 0, strpos(ltrim($line), " "));
+				$line = ltrim(substr(ltrim($line), strpos(ltrim($line), " ")));
+				$ping = substr(ltrim($line), 0, strpos(ltrim($line), " "));
+				$line = ltrim(substr(ltrim($line), strpos(ltrim($line), " ")));
+				$name = substr(ltrim($line), 0, strrpos(ltrim($line), '^7'));
+				$line = ltrim(substr(ltrim($line), strrpos(ltrim($line), '^7') + 2));
+				$lastmsg = substr(ltrim($line), 0, strpos(ltrim($line), " "));
+				$line = ltrim(substr(ltrim($line), strpos(ltrim($line), " ")));
+				$ip = substr(ltrim($line), 0, strpos(ltrim($line), " "));
+				$line = ltrim(substr(ltrim($line), strpos(ltrim($line), " ")));
+				$qport = substr(ltrim($line), 0, strpos(ltrim($line), " "));
+				$line = ltrim(substr(ltrim($line), strpos(ltrim($line), " ")));
+				$rate = $line;
+			}
+			$s = substr(strstr($s, "\n"), 1);
+			$loc = strpos($s, "\n");
+		} while ($loc > 0);
+
+	} // end rcon_status
+
+	public function rcon_dumpuser($server_reply) {
+
+	} // end rcon_status
+
+	public function rcon_alphastatus($server_reply) {
+
+	} // end rcon_alphastatus
+
+	public function rcon_urtstatus($server_reply) {
+
+	} // end rcon_urtstatus
+
 	public function get_action_info($line) {
 		// Get the type of action and return an array containing the [0]action, [1]timestamp and [2]line with action removed
 		if (strlen($line) == 0) {
@@ -68,16 +118,17 @@ class Parser {
 			$line = $this->get_action_info($line);
 			switch($line[0]) {
 				case "delimiter":
-					$this->stats->store_log_line($this->log->ltime, $this->log->ldate, $this->log->lepoch, $this->log->location, $this->log->last_line, 1);
+					$this->log->last_processed_delimeter = $this->log->last_line;
+
 					break;
 				case "InitGame:":
-					$this->stats->store_log_line($this->log->ltime, $this->log->ldate, $this->log->lepoch, $this->log->location, $this->log->last_line, 2);
+					//$this->stats->store_log_line($this->log->ltime, $this->log->ldate, $this->log->lepoch, $this->log->location, $this->log->last_line, 2);
 					break;
 				case "Warmup:":
-					$this->stats->store_log_line($this->log->ltime, $this->log->ldate, $this->log->lepoch, $this->log->location, $this->log->last_line, 3);
+					//$this->stats->store_log_line($this->log->ltime, $this->log->ldate, $this->log->lepoch, $this->log->location, $this->log->last_line, 3);
 					break;
 				case "InitRound:":
-					$this->stats->store_log_line($this->log->ltime, $this->log->ldate, $this->log->lepoch, $this->log->location, $this->log->last_line, 4);
+					//$this->stats->store_log_line($this->log->ltime, $this->log->ldate, $this->log->lepoch, $this->log->location, $this->log->last_line, 4);
 					break;
 				case "ClientConnect:":
 					$this->stats->store_log_line($this->log->ltime, $this->log->ldate, $this->log->lepoch, $this->log->location, $this->log->last_line, 5);

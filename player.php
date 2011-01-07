@@ -27,11 +27,12 @@
 
 // Version 0.1.2
 
-class Player {
+class Player extends Server {
 
 	// Properties
 
 	public $tags; // array of clan tags found on player
+	public $allowed_tags; // array of tags player allowed to wear
 	public $name; // client Name
 	public $names_id; // ID from database for Name
 	public $name_length; // Name length of client
@@ -43,6 +44,7 @@ class Player {
 	public $current_team; // Team as defined by log
 	public $assigned_team; // Team assigned by utility
 	public $time_connected; // Timestamp of when someone connected
+	public $last_updated; // Timestamp of the last time this player was updated
 	public $time_team_join; // Use to determine how long someone has been in spec
 	public $names_id_last_bleed; // name ID of last person to make this player bleed
 	public $ips_id_last_bleed; // ip ID of last person to make this player bleed
@@ -386,7 +388,7 @@ class Player {
 			$row = $this->db->get_row();
 			return $row[0];
 		}
-	}
+	} // end get_guids_id
 
 	public function create_player() {
 
@@ -396,9 +398,21 @@ class Player {
 		//
 	}
 
-	public function connect() {
+	public function connect($slot) {
 		// Perform connection operations
-
+		$this->guids_id = parent::get_guids_id($this->cl_guid);
+		if ($this->guids_id) {
+			// Player already exists
+		} else {
+			$this->guids_id = parent::store_guid($this->cl_guid);
+		}
+		$this->ips_id = parent::get_ips_id($this->ip);
+		if ($this->ips_id) {
+			// Player already exists
+		} else {
+			$this->ips_id = parent::store_ip($this->ip);
+		}
+		
 	}
 
 }

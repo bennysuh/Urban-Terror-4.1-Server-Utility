@@ -180,7 +180,7 @@ class Stats {
 		if ($info_changed) {
 			// Update restore info and get permissions
 			$this->server->slots[$slot]->get_permissions();
-			if ($this->server->slots[$slot]->tagged_up && $this->server->tag_enforcement() && !$this->properly_tagged($slot)) {
+			if ($this->server->slots[$slot]->tagged_up && $this->server->get_server_setting("tag_enforcement") && !$this->properly_tagged($slot)) {
 				$this->server->schedule_kick($slot, 0, "improperly tagged");
 			}
 			if ($this->server->name_reservations() && !$this->name_owner($name, $slot)) {
@@ -552,4 +552,16 @@ class Stats {
 			return 0;
 		}
 	} // end is_tagged_up
+
+	public function properly_tagged($slot) {
+		$j = 0;
+		$tagcount = count($this->server->slots[$slot]->tags, 0);
+		while ($j < $tagcount) {
+			if (array_search($this->server->slots[$slot]->tags[$j], $this->server->slots[$slot]->allowed_tags) === false) {
+				return false;
+			}
+			$j++;
+		}
+		return true;
+	} // end properly_tagged
 }
